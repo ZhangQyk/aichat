@@ -1,695 +1,527 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smali代码AI分析工具</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            padding: 20px;
-            min-height: 100vh;
-            color: #e2e8f0;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(2, 8, 20, 0.4);
-            padding: 30px;
-            border: 1px solid rgba(94, 234, 212, 0.1);
-        }
-
-        h1 {
-            text-align: center;
-            color: #5eead4;
-            margin-bottom: 30px;
-            font-size: 32px;
-            font-weight: 700;
-            text-shadow: 0 0 10px rgba(94, 234, 212, 0.3);
-            letter-spacing: 0.5px;
-        }
-
-        .config-section {
-            background: rgba(15, 23, 42, 0.5);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            border: 1px solid rgba(94, 234, 212, 0.15);
-            box-shadow: 0 4px 20px rgba(2, 8, 20, 0.3);
-        }
-
-        .config-row {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        .config-item {
-            flex: 1;
-            min-width: 200px;
-            position: relative;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #cbd5e1;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        input[type="text"], input[type="password"], .custom-select {
-            width: 100%;
-            padding: 12px 15px;
-            background: rgba(15, 23, 42, 0.4);
-            border: 1px solid rgba(94, 234, 212, 0.2);
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s;
-            color: #f1f5f9;
-            cursor: pointer;
-        }
-
-        input[type="text"]:focus, input[type="password"]:focus, .custom-select:focus {
-            outline: none;
-            border-color: #5eead4;
-            box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.2);
-        }
-
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .checkbox-item input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: #5eead4;
-        }
-
-        .checkbox-item label {
-            margin: 0;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .text-section {
-            margin-bottom: 20px;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 15px;
-            background: rgba(15, 23, 42, 0.4);
-            border: 1px solid rgba(94, 234, 212, 0.2);
-            border-radius: 8px;
-            font-size: 14px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            resize: vertical;
-            transition: all 0.3s;
-            color: #f1f5f9;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: #5eead4;
-            box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.2);
-        }
-
-        .code-input {
-            min-height: 300px;
-        }
-
-        .result-output {
-            min-height: 400px;
-            background: rgba(15, 23, 42, 0.4);
-        }
-
-        .button-section {
-            text-align: center;
-            margin: 25px 0;
-        }
-
-        .analyze-btn {
-            background: linear-gradient(135deg, #0ea5e9, #5eead4);
-            color: #0f172a;
-            border: none;
-            padding: 14px 45px;
-            font-size: 16px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
-        }
-
-        .analyze-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.4);
-        }
-
-        .analyze-btn:active {
-            transform: translateY(0);
-        }
-
-        .analyze-btn:disabled {
-            background: #475569;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(15, 23, 42, 0.3);
-            border-top: 3px solid #5eead4;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-message {
-            background: rgba(220, 38, 38, 0.15);
-            color: #fecaca;
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            border-left: 4px solid #ef4444;
-            display: none;
-            backdrop-filter: blur(5px);
-        }
-
-        .success-message {
-            background: rgba(34, 197, 94, 0.15);
-            color: #bbf7d0;
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            border-left: 4px solid #22c55e;
-            display: none;
-            backdrop-filter: blur(5px);
-        }
-
-        .model-info {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-top: 8px;
-        }
-
-        .prompt-section {
-            background: rgba(15, 23, 42, 0.5);
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(94, 234, 212, 0.15);
-        }
-
-        .prompt-textarea {
-            min-height: 100px;
-            font-family: inherit;
-        }
-
-        /* Custom Select Dropdown Styles */
-        .custom-select-wrapper {
-            position: relative;
-            width: 100%;
-        }
-
-        .custom-select {
-            position: relative;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 15px;
-            background: rgba(15, 23, 42, 0.4);
-            border: 1px solid rgba(94, 234, 212, 0.2);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            color: #f1f5f9;
-        }
-
-        .custom-select::after {
-            content: '▼';
-            font-size: 10px;
-            color: #5eead4;
-            transition: transform 0.3s;
-        }
-
-        .custom-select.active::after {
-            transform: rotate(180deg);
-        }
-
-        .custom-select-options {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(94, 234, 212, 0.3);
-            border-radius: 8px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(2, 8, 20, 0.6);
-            margin-top: 4px;
-        }
-
-        .custom-select-options.show {
-            display: block;
-        }
-
-        .custom-select-option {
-            padding: 12px 15px;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: #e2e8f0;
-            font-size: 14px;
-        }
-
-        .custom-select-option:hover {
-            background: rgba(94, 234, 212, 0.1);
-            color: #5eead4;
-        }
-
-        .custom-select-option.selected {
-            background: rgba(94, 234, 212, 0.15);
-            color: #5eead4;
-            font-weight: 500;
-        }
-
-        .custom-select-option.disabled {
-            color: #64748b;
-            cursor: not-allowed;
-        }
-
-        .custom-select-option.disabled:hover {
-            background: transparent;
-            color: #64748b;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-
-            .config-row {
-                flex-direction: column;
-            }
-
-            .config-item {
-                min-width: 100%;
-            }
-            
-            h1 {
-                font-size: 24px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Smali代码AI分析工具</h1>
-        
-        <div class="config-section">
-            <div class="config-row">
-                <div class="config-item">
-                    <label for="apiKey">API密钥:</label>
-                    <input type="password" id="apiKey" placeholder="输入您的API密钥">
-                    <div class="checkbox-item">
-                        <input type="checkbox" id="useBuiltinKey" checked>
-                        <label for="useBuiltinKey">使用内置密钥</label>
-                    </div>
-                </div>
-                <div class="config-item">
-                    <label for="apiUrl">API地址:</label>
-                    <input type="text" id="apiUrl" value="https://api.siliconflow.cn/v1/chat/completions" placeholder="输入API地址">
-                </div>
-            </div>
-            
-            <div class="config-row">
-                <div class="config-item">
-                    <label for="model">选择模型:</label>
-                    <div class="custom-select-wrapper">
-                        <div class="custom-select" id="modelSelect">
-                            <span class="selected-text">腾讯混元-MT-7B</span>
-                        </div>
-                        <div class="custom-select-options" id="modelOptions">
-                            <div class="custom-select-option selected" data-value="tencent/Hunyuan-MT-7B">腾讯混元-MT-7B</div>
-                            <div class="custom-select-option" data-value="THUDM/GLM-4.1V-9B-Thinking">智谱GLM-4V-9B</div>
-                            <div class="custom-select-option" data-value="deepseek-ai/DeepSeek-R1-0528-Qwen3-8B">DeepSeek-R1-0528</div>
-                            <div class="custom-select-option" data-value="Qwen/Qwen3-8B">通义千问3-8B</div>
-                            <div class="custom-select-option" data-value="THUDM/GLM-Z1-9B-0414">智谱GLM-Z1-9B</div>
-                            <div class="custom-select-option" data-value="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B">DeepSeek-R1-Distill</div>
-                            <div class="custom-select-option" data-value="Qwen/Qwen2.5-7B-Instruct">通义千问2.5-7B</div>
-                        </div>
-                    </div>
-                    <div class="model-info" id="modelInfo"></div>
-                </div>
-                <div class="config-item">
-                    <label for="questionMode">提问方式:</label>
-                    <div class="custom-select-wrapper">
-                        <div class="custom-select" id="questionModeSelect">
-                            <span class="selected-text">直接分析</span>
-                        </div>
-                        <div class="custom-select-options" id="questionModeOptions">
-                            <div class="custom-select-option selected" data-value="direct">直接分析</div>
-                            <div class="custom-select-option" data-value="custom">自定义提示词</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="prompt-section" id="promptSection" style="display: none;">
-            <label for="customPrompt">自定义提示词:</label>
-            <textarea id="customPrompt" class="prompt-textarea" placeholder="请输入自定义提示词...">你是一个专业的Smali代码分析助手。请仔细分析以下代码，并提供详细的技术分析。</textarea>
-        </div>
-
-        <div class="text-section">
-            <label for="codeInput">Smali代码:</label>
-            <textarea id="codeInput" class="code-input" placeholder="请粘贴您的Smali代码到此处..."></textarea>
-        </div>
-
-        <div class="button-section">
-            <button id="analyzeBtn" class="analyze-btn">开始分析</button>
-        </div>
-
-        <div class="error-message" id="errorMessage"></div>
-        <div class="success-message" id="successMessage"></div>
-
-        <div class="text-section">
-            <label for="resultOutput">分析结果:</label>
-            <textarea id="resultOutput" class="result-output" placeholder="分析结果将在此处显示..." readonly></textarea>
-        </div>
-    </div>
-
-    <script>
-        // 内置API密钥
-        const BUILTIN_API_KEY = "sk-ppwgpkclpzeqmrzoqtwwdceyvoxpbqjgrsajwyplikgdtoto";
-        
-        // 模型信息
-        const MODEL_INFO = {
-            'tencent/Hunyuan-MT-7B': '腾讯混元大语言模型，适用于多轮对话和文本生成',
-            'THUDM/GLM-4.1V-9B-Thinking': '智谱AI的思维链模型，适合复杂推理',
-            'deepseek-ai/DeepSeek-R1-0528-Qwen3-8B': '深度求索的R1模型，适合深度分析',
-            'Qwen/Qwen3-8B': '阿里云通义千问3模型，通用性强',
-            'THUDM/GLM-Z1-9B-0414': '智谱AI的Z1模型，性能优异',
-            'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B': 'DeepSeek的蒸馏模型，响应快速',
-            'Qwen/Qwen2.5-7B-Instruct': '通义千问2.5指令模型，适合代码分析'
-        };
-
-        // DOM元素
-        const apiKeyInput = document.getElementById('apiKey');
-        const apiUrlInput = document.getElementById('apiUrl');
-        const useBuiltinKeyCheckbox = document.getElementById('useBuiltinKey');
-        const modelSelect = document.getElementById('modelSelect');
-        const modelOptions = document.getElementById('modelOptions');
-        const questionModeSelect = document.getElementById('questionModeSelect');
-        const questionModeOptions = document.getElementById('questionModeOptions');
-        const customPromptSection = document.getElementById('promptSection');
-        const customPromptTextarea = document.getElementById('customPrompt');
-        const codeInput = document.getElementById('codeInput');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const resultOutput = document.getElementById('resultOutput');
-        const errorMessage = document.getElementById('errorMessage');
-        const successMessage = document.getElementById('successMessage');
-        const modelInfo = document.getElementById('modelInfo');
-
-        // 自定义选择框功能
-        function initCustomSelect(selectElement, optionsElement, optionsList, onSelect) {
-            selectElement.addEventListener('click', function(e) {
-                e.stopPropagation();
-                // 关闭其他打开的下拉框
-                document.querySelectorAll('.custom-select-options.show').forEach(el => {
-                    if (el !== optionsElement) {
-                        el.classList.remove('show');
-                        el.previousElementSibling.classList.remove('active');
-                    }
-                });
-                
-                optionsElement.classList.toggle('show');
-                selectElement.classList.toggle('active');
-            });
-
-            optionsList.forEach(option => {
-                option.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const value = this.dataset.value;
-                    const text = this.textContent;
-                    
-                    // 更新选中状态
-                    optionsList.forEach(opt => opt.classList.remove('selected'));
-                    this.classList.add('selected');
-                    
-                    // 更新显示文本
-                    selectElement.querySelector('.selected-text').textContent = text;
-                    
-                    // 关闭下拉框
-                    optionsElement.classList.remove('show');
-                    selectElement.classList.remove('active');
-                    
-                    // 执行回调
-                    if (onSelect) {
-                        onSelect(value, text);
-                    }
-                });
-            });
-
-            // 点击外部关闭下拉框
-            document.addEventListener('click', function() {
-                optionsElement.classList.remove('show');
-                selectElement.classList.remove('active');
-            });
-        }
-
-        // 事件监听
-        useBuiltinKeyCheckbox.addEventListener('change', function() {
-            apiKeyInput.disabled = this.checked;
-            if (this.checked) {
-                apiKeyInput.value = '';
-            }
-        });
-
-        // 模型选择回调
-        function onModelSelect(value, text) {
-            modelInfo.textContent = MODEL_INFO[value] || '';
-        }
-
-        // 提问方式选择回调
-        function onQuestionModeSelect(value, text) {
-            if (value === 'custom') {
-                customPromptSection.style.display = 'block';
-                customPromptTextarea.placeholder = "请输入自定义提示词...";
-            } else {
-                customPromptSection.style.display = 'none';
-            }
-        }
-
-        // 初始化自定义选择框
-        initCustomSelect(modelSelect, modelOptions, 
-            Array.from(modelOptions.querySelectorAll('.custom-select-option')), onModelSelect);
-        
-        initCustomSelect(questionModeSelect, questionModeOptions, 
-            Array.from(questionModeOptions.querySelectorAll('.custom-select-option')), onQuestionModeSelect);
-
-        analyzeBtn.addEventListener('click', analyzeCode);
-
-        // 初始化
-        apiKeyInput.disabled = useBuiltinKeyCheckbox.checked;
-        modelInfo.textContent = MODEL_INFO['tencent/Hunyuan-MT-7B'];
-
-        // 构建请求体
-        function buildRequestBody(code, model, questionMode, customPrompt) {
-            const messages = [];
-            
-            let content;
-            if (questionMode === 'custom') {
-                content = customPrompt + "\n\n```smali\n" + code + "\n```";
-            } else {
-                content = buildDirectPrompt(code, model);
-            }
-
-            messages.push({
-                role: 'user',
-                content: content
-            });
-
-            const requestBody = {
-                model: model,
-                messages: messages
-            };
-
-            // 根据模型类型设置参数
-            if (model.includes('deepseek')) {
-                requestBody.temperature = 0.1;
-                requestBody.max_tokens = 4000;
-                requestBody.top_p = 0.9;
-            } else if (model.includes('Thinking')) {
-                requestBody.temperature = 0.2;
-                requestBody.max_tokens = 3000;
-                requestBody.top_p = 0.95;
-            } else {
-                requestBody.temperature = 0.3;
-                requestBody.max_tokens = 2000;
-                requestBody.top_p = 0.85;
-            }
-
-            return requestBody;
-        }
-
-        // 构建直接分析提示词
-        function buildDirectPrompt(code, modelType) {
-            let prompt = "你是一个MT管理器Smali代码AI助手，请分析以下Smali代码：\n\n";
-            prompt += "```smali\n";
-            prompt += code;
-            prompt += "\n```\n\n";
-            prompt += "请提供清晰的解释，不要使用markdown格式，包括：1.代码功能 2.关键逻辑 3.潜在问题 4.与会员或登录相关的方法名";
-            
-            if (modelType.includes('deepseek')) {
-                prompt += "\n\n请进行深度思考分析，提供更详细的技术见解。";
-            }
-            
-            if (modelType.includes('Thinking')) {
-                prompt += "\n\n请使用思维链推理方式进行分析。";
-            }
-            
-            return prompt;
-        }
-
-        // 分析代码
-        async function analyzeCode() {
-            // 获取输入值
-            const code = codeInput.value.trim();
-            if (!code) {
-                showError('请输入Smali代码');
-                return;
-            }
-
-            const apiKey = useBuiltinKeyCheckbox.checked ? BUILTIN_API_KEY : apiKeyInput.value.trim();
-            if (!apiKey) {
-                showError('请输入API密钥');
-                return;
-            }
-
-            const apiUrl = apiUrlInput.value.trim() || 'https://api.siliconflow.cn/v1/chat/completions';
-            const model = modelSelect.querySelector('.selected-text').textContent;
-            const modelValue = Array.from(modelOptions.querySelectorAll('.custom-select-option')).find(opt => 
-                opt.classList.contains('selected'))?.dataset.value || 'tencent/Hunyuan-MT-7B';
-            const questionMode = questionModeSelect.querySelector('.selected-text').textContent;
-            const questionModeValue = Array.from(questionModeOptions.querySelectorAll('.custom-select-option')).find(opt => 
-                opt.classList.contains('selected'))?.dataset.value || 'direct';
-            const customPrompt = customPromptTextarea.value.trim();
-
-            // 禁用按钮并显示加载状态
-            analyzeBtn.disabled = true;
-            analyzeBtn.innerHTML = '<span class="loading"></span>分析中...';
-            hideMessages();
-
-            try {
-                const requestBody = buildRequestBody(code, modelValue, questionModeValue, customPrompt);
-                
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API请求失败: ${response.status} - ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                const result = parseResponse(data);
-                
-                resultOutput.value = result;
-                showSuccess('分析完成');
-                
-            } catch (error) {
-                showError('分析出错: ' + error.message);
-                console.error('分析错误:', error);
-            } finally {
-                // 恢复按钮状态
-                analyzeBtn.disabled = false;
-                analyzeBtn.innerHTML = '开始分析';
-            }
-        }
-
-        // 解析响应
-        function parseResponse(response) {
-            if (response.choices && response.choices.length > 0) {
-                const choice = response.choices[0];
-                if (choice.message && choice.message.content) {
-                    return choice.message.content;
-                } else if (choice.text) {
-                    return choice.text;
-                }
-            }
-            throw new Error('无法解析AI响应');
-        }
-
-        // 显示错误信息
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            successMessage.style.display = 'none';
-        }
-
-        // 显示成功信息
-        function showSuccess(message) {
-            successMessage.textContent = message;
-            successMessage.style.display = 'block';
-            errorMessage.style.display = 'none';
-        }
-
-        // 隐藏消息
-        function hideMessages() {
-            errorMessage.style.display = 'none';
-            successMessage.style.display = 'none';
-        }
-
-        // 添加示例代码功能
-        codeInput.addEventListener('focus', function() {
-            if (!this.value) {
-                this.placeholder = `.class public Lcom/example/MainActivity;
-.super Landroid/app/Activity;
-
-.method protected onCreate(Landroid/os/Bundle;)V
-    .locals 1
-    invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
-    return-void
-.end method`;
-            }
-        });
-    </script>
-</body>
-</html>
+<!doctype html><html lang="zh-CN"><head><link rel="icon" type="image/png" href="https://icdn.binmt.cc/2512/6945557aba41b.png"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>秋枫AI 2.0</title><style>
+:root{
+  --bg:#0f172a;
+  --panel:#1e293b;
+  --accent:#5eead4;
+  --text:#e2e8f0;
+  --sub:#94a3b8;
+  --error:#ef4444;
+  --code-bg:#011627;
+  --ai-bg:#1e293b;
+  --ai-text:#cbd5e1;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:linear-gradient(135deg,var(--bg),var(--panel));
+  color:var(--text);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;
+  background:rgba(15,23,42,.7);
+  border-bottom:1px solid rgba(94,234,212,.1);
+}
+header h1{font-size:20px;color:var(--accent);letter-spacing:.5px;}
+
+
+.more-box{position:relative;}
+.more-btn{
+  background:rgba(94,234,212,.1);
+  border:1px solid var(--accent);
+  color:var(--accent);
+  padding:6px 14px;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  transition:all .3s ease;
+}
+.more-btn:active{transform:scale(.95);}
+.more-panel{
+  position:absolute;
+  top:110%;right:0;
+  width:300px;
+  background:rgba(15,23,42,.95);
+  border:1px solid rgba(94,234,212,.2);
+  border-radius:8px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  box-shadow:0 8px 32px rgba(2,8,20,.6);
+  z-index:10;
+  opacity:0;
+  transform:translateY(-10px);
+  pointer-events:none;
+  transition:opacity .3s ease, transform .3s ease;
+}
+.more-panel.show{
+  opacity:1;
+  transform:translateY(0);
+  pointer-events:auto;
+}
+.more-panel label{font-size:12px;color:var(--sub);}
+.more-panel input{
+  width:100%;
+  padding:8px 10px;
+  border:1px solid rgba(94,234,212,.2);
+  border-radius:4px;
+  background:rgba(15,23,42,.4);
+  color:var(--text);
+  font-size:13px;
+}
+.more-panel input:focus{outline:none;border-color:var(--accent);}
+.check-line{display:flex;align-items:center;gap:6px;font-size:13px;}
+.check-line input{width:auto;}
+/* 署名小字 */
+.panel-footer{
+  margin-top:6px;
+  font-size:11px;
+  color:var(--sub);
+  text-align:center;
+  letter-spacing:.5px;
+}
+
+
+.model-fold{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 20px;
+  background:rgba(15,23,42,.5);
+  border-bottom:1px solid rgba(94,234,212,.1);
+  font-size:13px;
+  color:var(--sub);
+}
+.fold-btn{
+  padding:4px 10px;
+  border:1px solid rgba(94,234,212,.3);
+  background:transparent;
+  color:var(--accent);
+  border-radius:4px;
+  cursor:pointer;
+  font-size:12px;
+  transition:.2s;
+}
+.fold-btn:hover{background:rgba(94,234,212,.1);}
+.model-bar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 20px;
+  background:rgba(15,23,42,.5);
+  border-bottom:1px solid rgba(94,234,212,.1);
+  flex-wrap:wrap;
+  max-height:200px;
+  overflow:hidden;
+  transition:max-height .3s;
+}
+.model-bar.collapsed{max-height:0;padding:0 20px;border-bottom:none;}
+.model-card{
+  padding:6px 14px;
+  border:1px solid rgba(94,234,212,.2);
+  border-radius:20px;
+  cursor:pointer;
+  font-size:13px;
+  transition:.2s;
+}
+.model-card.active{
+  background:var(--accent);
+  color:#0f172a;
+  border-color:var(--accent);
+}
+.model-card:hover:not(.active){border-color:var(--accent);}
+
+
+main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.chat-box{
+  flex:1;
+  overflow-y:auto;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.msg{
+  max-width:78%;
+  padding:10px 14px;
+  border-radius:10px;
+  font-size:15px;
+  line-height:1.5;
+  word-break:break-word;
+}
+.user{
+  align-self:flex-end;
+  background:linear-gradient(135deg,var(--accent),#0ea5e9);
+  color:#0f172a;
+}
+.ai-card{
+  align-self:stretch;
+  background:var(--ai-bg);
+  color:var(--ai-text);
+  border:1px solid rgba(94,234,212,.15);
+  border-radius:10px;
+  padding:14px 18px;
+  box-shadow:inset 0 0 8px rgba(94,234,212,.05);
+  font-size:15px;
+  line-height:1.6;
+  overflow-wrap:break-word;
+}
+/* 旋转动效 */
+.thinking{
+  align-self:flex-start;
+  display:flex;align-items:center;gap:8px;
+  background:rgba(94,234,212,.1);
+  color:var(--accent);
+  font-size:13px;
+  padding:8px 14px;
+  border-radius:16px;
+}
+.spin{
+  width:14px;height:14px;
+  border:2px solid rgba(94,234,212,.3);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Markdown 高亮 */
+.ai-card h1,.ai-card h2,.ai-card h3{margin:.4em 0;font-weight:600;color:var(--accent);}
+.ai-card pre{
+  background:var(--code-bg);
+  color:#d6f6ff;
+  padding:10px 12px;
+  border-radius:6px;
+  overflow-x:auto;
+  font-size:13px;
+  margin:.5em 0;
+}
+.ai-card code{
+  background:rgba(94,234,212,.15);
+  color:var(--accent);
+  padding:2px 4px;
+  border-radius:4px;
+  font-size:13px;
+}
+.ai-card blockquote{
+  border-left:4px solid var(--accent);
+  padding-left:12px;
+  margin:.5em 0;
+  color:var(--sub);
+}
+.ai-card ul,.ai-card ol{margin-left:1.2em;}
+.ai-card li{margin:.2em 0;}
+.ai-card a{color:var(--accent);text-decoration:none;}
+.ai-card a:hover{text-decoration:underline;}
+/* 超长链接强制换行 */
+.ai-card pre,.ai-card code{white-space:pre-wrap;word-break:break-all;}
+
+
+.input-bar{
+  display:flex;align-items:flex-end;gap:10px;
+  padding:12px 16px;
+  background:rgba(15,23,42,.5);
+  border-top:1px solid rgba(94,234,212,.1);
+}
+#msgInput{
+  flex:1;
+  resize:none;
+  padding:10px 12px;
+  border:1px solid rgba(94,234,212,.2);
+  border-radius:6px;
+  background:rgba(15,23,42,.4);
+  color:var(--text);
+  font-size:14px;
+  max-height:calc(1.5em * 4 + 20px); /* 4行 */
+  overflow-y:auto;
+}
+#sendBtn{
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  background:var(--accent);
+  color:#0f172a;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .3s ease;
+}
+#sendBtn:active{transform:scale(.95);}
+#sendBtn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* 全屏按钮动画 */
+#fullScreenBtn{
+  margin-left:8px;
+  padding:6px 12px;
+  border:1px solid rgba(94,234,212,.3);
+  background:transparent;
+  color:var(--accent);
+  border-radius:6px;
+  cursor:pointer;
+  font-size:12px;
+  transition:all .3s ease;
+}
+#fullScreenBtn:active{transform:scale(.95);}
+#fullScreenBtn:hover{background:rgba(94,234,212,.1);}
+
+/* 全屏编辑 */
+.fullscreen{
+  position:fixed;
+  inset:0;
+  background:var(--bg);
+  z-index:100;
+  display:flex;
+  flex-direction:column;
+  padding:20px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .3s ease;
+}
+.fullscreen.show{
+  opacity:1;
+  pointer-events:auto;
+}
+.fullscreen textarea{
+  flex:1;
+  width:100%;
+  padding:20px;
+  font-size:18px;
+  line-height:1.6;
+  resize:none;
+  border:1px solid var(--accent);
+  border-radius:8px;
+  background:rgba(15,23,42,.5);
+  color:var(--text);
+}
+.fullscreen .fs-actions{
+  margin-top:12px;
+  display:flex;
+  gap:12px;
+  justify-content:flex-end;
+}
+.fullscreen .fs-actions button{
+  padding:8px 16px;
+  border:1px solid var(--accent);
+  background:transparent;
+  color:var(--accent);
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+  transition:all .3s ease;
+}
+.fullscreen .fs-actions button:active{transform:scale(.95);}
+.fullscreen .fs-actions button:hover{background:rgba(94,234,212,.1);}
+
+
+@keyframes msgIn{
+  from{opacity:0;transform:translateY(15px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.msg, .ai-card, .thinking{
+  animation:msgIn .35s ease forwards;
+}
+
+#errorTip{
+  padding:8px 12px;
+  background:rgba(220,38,38,.15);
+  color:#fecaca;
+  border-left:3px solid var(--error);
+  font-size:13px;
+  display:none;
+}
+@media(max-width:600px){
+  .msg{max-width:90%;}
+}
+</style></head><body><header><h1>秋枫AI 2.0</h1><div class="more-box"><button class="more-btn" id="moreBtn">更多</button><div class="more-panel" id="morePanel"><label>API 地址</label><input id="apiUrl" type="text" value="https://api.siliconflow.cn/v1/chat/completions"><label>API 密钥</label><input id="apiKey" type="password" placeholder="留空使用内置"><div class="check-line"><input id="useBuiltin" type="checkbox" checked><label for="useBuiltin">使用内置密钥</label></div><div class="panel-footer">From：秋枫Mod<br>Made By Kimi AI<br>https://zyk.netlify.app</div></div></div></header><!-- 模型选择折叠栏 --><div class="model-fold"><span style="font-size:13px;color:var(--sub)">模型：</span><button class="fold-btn" id="foldBtn">展开</button></div><div class="model-bar collapsed" id="modelBar"><div class="model-card active" data-val="tencent/Hunyuan-MT-7B">腾讯混元-MT-7B</div><div class="model-card" data-val="THUDM/GLM-4.1V-9B-Thinking">智谱GLM-4V-9B</div><div class="model-card" data-val="deepseek-ai/DeepSeek-R1-0528-Qwen3-8B">DeepSeek-R1-0528</div><div class="model-card" data-val="Qwen/Qwen3-8B">通义千问3-8B</div><div class="model-card" data-val="THUDM/GLM-Z1-9B-0414">智谱GLM-Z1-9B</div><div class="model-card" data-val="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B">DeepSeek-R1-Distill</div><div class="model-card" data-val="Qwen/Qwen2.5-7B-Instruct">通义千问2.5-7B</div></div><main><div class="chat-box" id="chatBox"></div><div class="input-bar"><textarea id="msgInput" rows="1" placeholder="输入消息"></textarea><button id="sendBtn">发送</button><button id="fullScreenBtn">全屏</button></div><div id="errorTip"></div></main><script>
+
+const BUILTIN_KEY = "sk-ppwgpkclpzeqmrzoqtwwdceyvoxpbqjgrsajwyplikgdtoto";
+
+
+const moreBtn   = document.getElementById('moreBtn');
+const morePanel = document.getElementById('morePanel');
+const apiUrlIn  = document.getElementById('apiUrl');
+const apiKeyIn  = document.getElementById('apiKey');
+const useBuiltin= document.getElementById('useBuiltin');
+const foldBtn   = document.getElementById('foldBtn');
+const modelBar  = document.getElementById('modelBar');
+const modelCards= document.querySelectorAll('.model-card');
+const chatBox   = document.getElementById('chatBox');
+const msgInput  = document.getElementById('msgInput');
+const sendBtn   = document.getElementById('sendBtn');
+const fullBtn   = document.getElementById('fullScreenBtn');
+const errorTip  = document.getElementById('errorTip');
+
+let currentModel = 'tencent/Hunyuan-MT-7B';
+let history = [];
+
+
+moreBtn.onclick = ()=> morePanel.classList.toggle('show');
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.more-box')) morePanel.classList.remove('show');
+});
+useBuiltin.onchange = ()=>{
+  apiKeyIn.disabled = useBuiltin.checked;
+  if(useBuiltin.checked) apiKeyIn.value = '';
+};
+apiKeyIn.disabled = useBuiltin.checked;
+
+
+foldBtn.onclick = ()=>{
+  modelBar.classList.toggle('collapsed');
+  foldBtn.textContent = modelBar.classList.contains('collapsed') ? '展开' : '收起';
+};
+modelCards.forEach(card=>{
+  card.addEventListener('click', ()=>{
+    modelCards.forEach(c=>c.classList.remove('active'));
+    card.classList.add('active');
+    currentModel = card.dataset.val;
+  });
+});
+
+
+function addUserMsg(text){
+  const div = document.createElement('div');
+  div.className = 'msg user';
+  div.textContent = text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  // 动画结束移除类
+  div.addEventListener('animationend', ()=> div.style.animation = '');
+}
+function addAIMsg(html){
+  const wrap = document.createElement('div');
+  wrap.className = 'ai-card';
+  wrap.innerHTML = html;
+  chatBox.appendChild(wrap);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  wrap.addEventListener('animationend', ()=> wrap.style.animation = '');
+}
+function addThinking(){
+  const div = document.createElement('div');
+  div.className = 'thinking';
+  div.innerHTML = '<div class="spin"></div><span>思考中…</span>';
+  div.id = 'thinking';
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  div.addEventListener('animationend', ()=> div.style.animation = '');
+  return div;
+}
+
+
+function md2html(md){
+  return md
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
+    .replace(/^[-*] (.*$)/gim, '<ul><li>$1</li></ul>')
+    .replace(/^\d+\. (.*$)/gim, '<ol><li>$1</li></ol>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\n/g, '<br>');
+}
+
+
+function autoGrow(){
+  const maxRows = 4;
+  const lh = 1.5;
+  const rows = Math.min(maxRows, Math.ceil(this.scrollHeight / (lh * 16)));
+  this.rows = rows;
+}
+msgInput.addEventListener('input', autoGrow);
+
+let fsDiv = null;
+function openFullScreen(){
+  fsDiv = document.createElement('div');
+  fsDiv.className = 'fullscreen';
+  const ta = document.createElement('textarea');
+  ta.value = msgInput.value;
+  ta.spellcheck = false;
+  const actions = document.createElement('div');
+  actions.className = 'fs-actions';
+  const okBtn = document.createElement('button');
+  okBtn.textContent = '确定';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = '取消';
+  actions.append(cancelBtn, okBtn);
+  fsDiv.append(ta, actions);
+  document.body.appendChild(fsDiv);
+  // 动画入场
+  requestAnimationFrame(()=> fsDiv.classList.add('show'));
+  ta.focus();
+  okBtn.onclick = ()=>{
+    msgInput.value = ta.value;
+    autoGrow.call(msgInput);
+    closeFullScreen();
+  };
+  cancelBtn.onclick = closeFullScreen;
+  ta.onkeydown = e=>{
+    if(e.key === 'Escape') closeFullScreen();
+  };
+}
+function closeFullScreen(){
+  if(!fsDiv) return;
+  fsDiv.classList.remove('show');
+  fsDiv.addEventListener('transitionend', ()=>{
+    if(fsDiv) document.body.removeChild(fsDiv), fsDiv = null;
+  }, {once:true});
+}
+fullBtn.onclick = openFullScreen;
+
+
+sendBtn.onclick = async ()=>{
+  const content = msgInput.value.trim();
+  if(!content) return;
+  addUserMsg(content);
+  history.push({role:'user', content});
+  msgInput.value = '';
+  autoGrow.call(msgInput);
+
+  const key = useBuiltin.checked ? BUILTIN_KEY : apiKeyIn.value.trim();
+  if(!key) return showErr('请填写 API 密钥');
+  const url = apiUrlIn.value.trim();
+
+  const thinking = addThinking();
+  sendBtn.disabled = true;
+
+  try{
+    const res = await fetch(url,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${key}`
+      },
+      body:JSON.stringify({
+        model: currentModel,
+        messages: history,
+        temperature: 0.7,
+        max_tokens: 2000,
+        top_p: 0.85
+      })
+    });
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const json = await res.json();
+    const reply = json.choices[0].message.content;
+    thinking.remove();
+    addAIMsg(md2html(reply));
+    history.push({role:'assistant', content:reply});
+  }catch(e){
+    thinking.remove();
+    showErr(e.message);
+  }finally{
+    sendBtn.disabled = false;
+  }
+};
+
+function showErr(msg){
+  errorTip.textContent = msg;
+  errorTip.style.display = 'block';
+  setTimeout(()=>errorTip.style.display='none',3000);
+}
+</script></body></html>
